@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StudyMate AI - Smart Study Assistant for Students</title>
+  <meta name="description"
+    content="Transform study notes instantly into bullet summaries, simple ELI5 explanations, practice quiz questions, and flashcards using Gemini AI.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+    rel="stylesheet">
+
+  <link rel="stylesheet" href="./src/style.css">
+</head>
+
+<body data-theme="dark">
+  <div id="app">
+    <!-- Navigation Header -->
+    <header class="app-header">
+      <div class="header-container">
+        <div class="brand">
+          <div class="logo-icon">
+            🎓
+          </div>
+          <div class="brand-text">
+            <h1>StudyMate <span class="gradient-text">AI</span></h1>
+            <p class="tagline">Your AI-Powered Study Buddy</p>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <!-- API Key Trigger -->
+          <button id="apiKeyBtn" class="pill-btn key-btn" title="Configure Gemini API Key">
+            <span class="key-status-indicator" id="keyIndicator"></span>
+            <span class="btn-icon">🔑</span>
+            <span class="btn-text">API Key</span>
+          </button>
+
+          <!-- Theme Toggle -->
+          <button id="themeToggleBtn" class="icon-btn" title="Toggle Light/Dark Theme" aria-label="Toggle theme">
+            <span class="theme-icon">🌙</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-content">
+      <div class="content-grid">
+
+        <!-- Left Panel: Input & Sample Notes -->
+        <section class="card input-card">
+          <div class="card-header">
+            <div class="header-title">
+              <span class="section-icon">📝</span>
+              <h2>Study Notes Input</h2>
+            </div>
+            <div class="card-meta">
+              <span id="wordCount" class="badge text-badge">0 words</span>
+              <span id="charCount" class="badge text-badge">0 chars</span>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Sample Preset Chips -->
+            <div class="presets-container">
+              <span class="presets-label">⚡ Try sample notes:</span>
+              <div class="preset-chips">
+                <button class="chip-btn" data-preset="bankers">💻 OS: Banker's Algorithm</button>
+                <button class="chip-btn" data-preset="dijkstra">⚡ DSA: Dijkstra's Shortest Path</button>
+                <button class="chip-btn" data-preset="bplusTree">🗄️ DBMS: B+ Tree Indexing</button>
+              </div>
+            </div>
+
+            <!-- Notes Textarea -->
+            <div class="textarea-wrapper">
+              <textarea id="notesInput"
+                placeholder="Paste or type your CS lecture notes, algorithm specs, or textbook concepts here...&#10;&#10;Example: Banker's algorithm tests for safety by simulating the allocation of maximum declared resources for all processes before granting requests..."
+                rows="10" spellcheck="true"></textarea>
+
+              <div class="textarea-actions">
+                <button id="pasteBtn" class="subtle-btn" title="Paste clipboard text">
+                  📋 Paste Clipboard
+                </button>
+                <button id="clearBtn" class="subtle-btn warning-text" title="Clear notes">
+                  🗑️ Clear Notes
+                </button>
+              </div>
+            </div>
+
+            <!-- AI Action Buttons Grid -->
+            <div class="actions-section">
+              <h3 class="actions-title">Choose AI Action:</h3>
+              <div class="action-buttons-grid">
+
+                <button id="btnSummarize" class="action-btn action-summarize" data-action="summarize">
+                  <div class="btn-glow"></div>
+                  <span class="action-icon">✨</span>
+                  <div class="action-label">
+                    <strong>Summarize</strong>
+                    <small>Bulleted Key Takeaways</small>
+                  </div>
+                </button>
+
+                <button id="btnExplain" class="action-btn action-explain" data-action="explain">
+                  <div class="btn-glow"></div>
+                  <span class="action-icon">💡</span>
+                  <div class="action-label">
+                    <strong>Explain Simply</strong>
+                    <small>ELI5 & Analogies</small>
+                  </div>
+                </button>
+
+                <button id="btnQuestions" class="action-btn action-questions" data-action="questions">
+                  <div class="btn-glow"></div>
+                  <span class="action-icon">🎯</span>
+                  <div class="action-label">
+                    <strong>Generate Questions</strong>
+                    <small>Quiz & Answer Key</small>
+                  </div>
+                </button>
+
+                <button id="btnFlashcards" class="action-btn action-flashcards" data-action="flashcards">
+                  <div class="btn-glow"></div>
+                  <span class="action-icon">🎴</span>
+                  <div class="action-label">
+                    <strong>Flashcards</strong>
+                    <small>Terms & Definitions</small>
+                  </div>
+                </button>
+
+                <button id="btnDiagram" class="action-btn action-diagram" data-action="diagram">
+                  <div class="btn-glow"></div>
+                  <span class="action-icon">🗺️</span>
+                  <div class="action-label">
+                    <strong>Mind Map / Diagram</strong>
+                    <small>Mermaid Flowchart</small>
+                  </div>
+                </button>
+
+              </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- Right Panel: AI Output Response -->
+        <section class="card output-card" id="outputSection">
+          <div class="card-header">
+            <div class="header-title">
+              <span class="section-icon" id="outputIcon">🤖</span>
+              <h2 id="outputTitle">AI Response</h2>
+            </div>
+
+            <div class="output-controls" id="outputControls" style="display: none;">
+              <!-- Copy Response -->
+              <button id="copyBtn" class="tool-btn" title="Copy response text to clipboard">
+                📋 Copy
+              </button>
+              <!-- Export PDF -->
+              <button id="pdfBtn" class="tool-btn" title="Export response as PDF document">
+                📄 Export PDF
+              </button>
+              <!-- Speech Read Aloud -->
+              <button id="speakBtn" class="tool-btn speak-tool-btn" title="Read response hands-free with Audio Reader">
+                <span class="speaker-icon-anim">🔊</span> <span class="speak-label">Listen</span>
+              </button>
+              <!-- Download Text -->
+              <button id="downloadBtn" class="tool-btn" title="Download Markdown file">
+                💾 Save MD
+              </button>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <!-- Empty State placeholder -->
+            <div id="emptyState" class="empty-state">
+              <div class="empty-illustration">✨</div>
+              <h3>Ready for Your Notes</h3>
+              <p>Enter or paste your study notes on the left and click any AI action button above to generate summaries,
+                simple explanations, or quiz practice!</p>
+            </div>
+
+            <!-- Loading Skeleton state -->
+            <div id="loadingState" class="loading-state" style="display: none;">
+              <div class="spinner-container">
+                <div class="pulse-ring"></div>
+                <div class="ai-brain-pulse">🤖</div>
+              </div>
+              <h3 id="loadingText">StudyMate AI is analyzing your notes...</h3>
+              <p class="loading-subtext">Distilling facts, crafting analogies, & organizing concepts...</p>
+
+              <div class="skeleton-loader">
+                <div class="skeleton-line full"></div>
+                <div class="skeleton-line w-90"></div>
+                <div class="skeleton-line w-80"></div>
+                <div class="skeleton-line w-60"></div>
+              </div>
+            </div>
+
+            <!-- Error State -->
+            <div id="errorState" class="error-state" style="display: none;">
+              <div class="error-icon">⚠️</div>
+              <h3 id="errorTitle">Oops! Something went wrong</h3>
+              <p id="errorMessage" class="error-desc"></p>
+              <button id="errorFixBtn" class="primary-btn sm-btn">Fix API Key</button>
+            </div>
+
+            <!-- AI Rendered Markdown Response Container -->
+            <div id="responseContainer" class="response-container markdown-body" style="display: none;"></div>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Made with ❤️ for Students • Powered by Google Gemini 3.6 Flash</p>
+    </footer>
+  </div>
+
+  <!-- API Key Modal Dialog -->
+  <div id="apiKeyModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>🔑 Configure Gemini API Key</h3>
+        <button id="closeModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          To enable StudyMate AI features, enter your <strong>Google Gemini API Key</strong>. Your key is stored locally
+          in your browser and never sent anywhere else.
+        </p>
+
+        <div class="form-group">
+          <label for="apiKeyInput">Gemini API Key:</label>
+          <div class="input-with-toggle">
+            <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off">
+            <button id="toggleKeyVisibility" class="icon-btn inner-btn" title="Show/Hide Key">👁️</button>
+          </div>
+        </div>
+
+        <div class="api-help-notice">
+          <span>💡 Don't have a key?</span>
+          <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Get a free key from
+            Google AI Studio &rarr;</a>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="removeKeyBtn" class="subtle-btn warning-text">Remove Key</button>
+        <div class="modal-footer-right">
+          <button id="cancelKeyBtn" class="subtle-btn">Cancel</button>
+          <button id="saveKeyBtn" class="primary-btn">Save Key</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Vite entry script -->
+  <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
