@@ -1,13 +1,50 @@
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Calls Gemini API with hyper-fast real-time response streaming for Computer Science & Engineering content.
- * Configured with Engineering Professor persona, temperature 0.3, topP 0.8, topK 20, maxOutputTokens 800.
+ * Detects whether the input notes are about Computer Science/Algorithms, Math, or General Science/Academic topics.
+ * @param {string} text The user's study notes content.
+ * @returns {string} 'cs' | 'math' | 'general'
+ */
+function detectSubjectCategory(text) {
+  if (!text) return "general";
+  const lower = text.toLowerCase();
+
+  const csKeywords = [
+    "algorithm", "function", "array", "tree", "graph", "database", "sql",
+    "pointer", "complexity", "o(n)", "binary", "class", "recursion", "os",
+    "dbms", "dijkstra", "banker", "system", "network", "cpu", "thread",
+    "hash", "stack", "queue", "variable", "code", "programming", "node", "sorting"
+  ];
+
+  const mathKeywords = [
+    "matrix", "equation", "calculus", "integral", "derivative", "vector",
+    "proof", "theorem", "algebra", "geometry", "probability", "statistics"
+  ];
+
+  let csCount = 0;
+  for (const kw of csKeywords) {
+    if (lower.includes(kw)) csCount++;
+  }
+
+  let mathCount = 0;
+  for (const kw of mathKeywords) {
+    if (lower.includes(kw)) mathCount++;
+  }
+
+  if (csCount >= 2) return "cs";
+  if (mathCount >= 2) return "math";
+  return "general";
+}
+
+/**
+ * Calls Gemini API with real-time response streaming for study notes.
+ * Dynamic subject handling (Biology, History, Science, Math, CS) without forcing CS constraints on general topics.
+ * High maxOutputTokens (2048) to prevent response truncation.
  * 
  * @param {string} apiKey User-provided API key or fallback env variable.
  * @param {string} actionType 'summarize' | 'explain' | 'questions' | 'flashcards' | 'diagram'
  * @param {string} notesText The student's study notes content.
- * @param {function(string, string): void} onChunk Callback invoked as each streaming chunk arrives (chunkText, currentFullText).
+ * @param {function(string, string): void} onChunk Callback invoked as each streaming chunk arrives.
  * @returns {Promise<string>} Full accumulated markdown text response.
  */
 export async function generateStudyAIStream(apiKey, actionType, notesText, onChunk) {
@@ -19,41 +56,58 @@ export async function generateStudyAIStream(apiKey, actionType, notesText, onChu
 
   const ai = new GoogleGenAI({ apiKey: activeKey });
   const modelName = "gemini-3.6-flash";
+  const subjectCategory = detectSubjectCategory(notesText);
+
+  // System Instruction: Adaptable tutor persona across Science, History, Math, CS, and General subjects
+  const systemInstruction = `You are an expert AI Study Assistant and Master Tutor across all academic disciplines (Biology, Science, History, Math, Computer Science, Literature, etc.).
+Your goal is to make complex study concepts effortless to learn.
+
+Core Directives:
+1. Dynamic Subject Tone: Adapt explanations naturally to the domain of the notes (e.g. biological mechanisms for Biology, historical context for History, equations for Math, algorithms for CS).
+2. No Forced CS Constraints: Do NOT hardcode or force "Time Complexity", "Space Complexity", or "Edge Cases" UNLESS the user's input is explicitly about computer science, algorithms, or programming code.
+3. High Clarity & Structure: Use clean Markdown formatting with clear headings, bold key terms, bullet points, and code backticks for formulas/variables (do NOT output raw LaTeX dollar signs \$\$).
+4. Conciseness: Avoid fluff or pleasantries; jump straight into high-value study content.`;
 
   let prompt = "";
-  const systemInstruction = `You are an expert Computer Science & Engineering Professor and AI Tutor.
-Provide rigorous, technical explanations using clear, concise language and intuitive real-world engineering analogies.
-Rules:
-- Format output systematically with clear Markdown headings, technical key terms, time/space complexity (e.g., O(n), O((V+E) log V), O(log_B N)), and logical step-by-step breakdowns.
-- Omit conversational fluff, elementary filler, or generic introductory/concluding pleasantries.
-- Output high-impact, exam-ready engineering content directly.`;
 
   switch (actionType) {
-    case "summarize":
-      prompt = `Provide a rigorous, high-impact engineering summary of these notes:
+    case "explain":
+      if (subjectCategory === "cs") {
+        prompt = `Explain these Computer Science notes simply and intuitively:
 
-📌 **ENGINEERING EXECUTIVE SUMMARY**
-(2 technical sentences summarizing core system/algorithm mechanism)
-
-🎯 **CORE ARCHITECTURAL TAKEAWAYS**
-(Bulleted list of critical engineering principles, invariants, and implementation facts)
-
-🧠 **TECHNICAL TERMS & COMPLEXITY**
-(Bold key terms with 1-line definitions and time/space complexity bounds where applicable)
+1. 💡 **Core Intuition & Real-World Analogy**: High-level overview with 1 clear analogy (e.g. bank teller, postal system).
+2. ⚙️ **Step-by-Step Mechanism**: How the system or algorithm works sequentially.
+3. ⏱️ **Complexity & Considerations**: Time/space complexity bounds and edge cases to remember for exams.
 
 Notes:
 """
 ${notesText}
 """`;
+      } else {
+        prompt = `Explain these study notes simply and intuitively:
+
+1. 💡 **Core Intuition & Real-World Analogy**: Start with an intuitive, real-world analogy (ELI5) that makes the concept instantly clear.
+2. 🔬 **Step-by-Step Explanation**: Break down how it works step-by-step using clear, simple language.
+3. 📌 **Key Concepts & Takeaways**: Highlight essential rules, key vocabulary, or common misconceptions to watch out for.
+
+Notes:
+"""
+${notesText}
+"""`;
+      }
       break;
 
-    case "explain":
-      prompt = `Provide a rigorous yet intuitive engineering breakdown of the core concepts:
+    case "summarize":
+      prompt = `Provide a clean, well-structured summary of these study notes:
 
-1. **System Architecture / Core Mechanism**: Technical high-level overview.
-2. **Algorithmic Step-by-Step Flow**: Logical sequential execution breakdown.
-3. **Engineering Analogy**: 1 clear, intuitive real-world system analogy (e.g. bank teller resource allocation, highway network routing, disk block indexing).
-4. **Complexity & Edge Cases**: Big-O Time/Space complexity analysis and critical edge case traps to avoid in exams/interviews.
+📌 **EXECUTIVE SUMMARY**
+(2 concise sentences capturing the core essence of the topic)
+
+🎯 **KEY TAKEAWAYS & CORE FACTS**
+(Bulleted list of essential principles, facts, and key ideas)
+
+🧠 **ESSENTIAL CONCEPTS & DEFINITIONS**
+(Bold key terms with 1-line clear definitions)
 
 Notes:
 """
@@ -62,16 +116,16 @@ ${notesText}
       break;
 
     case "questions":
-      prompt = `Generate 4 to 5 rigorous multiple-choice engineering exam questions based on the notes. Format EACH question strictly:
+      prompt = `Generate 4 to 5 multiple-choice practice quiz questions based on the notes. Format EACH question strictly as follows so it can be rendered interactively:
 
 ---QUESTION---
-Q: [Technical question testing algorithms, data structures, or systems concepts]
+Q: [Clear multiple choice question testing key concepts]
 A) [Option A]
 B) [Option B]
 C) [Option C]
 D) [Option D]
 CORRECT: [A, B, C, or D]
-EXPLANATION: [Concise technical justification with mathematical or algorithmic proof]
+EXPLANATION: [Clear explanation of why this answer is correct based on the notes]
 
 Notes:
 """
@@ -80,11 +134,11 @@ ${notesText}
       break;
 
     case "flashcards":
-      prompt = `Extract 5 to 8 key engineering flashcard pairs (formulas, algorithms, data structures, complexities) from the notes. Format EACH card strictly:
+      prompt = `Extract 5 to 8 essential terms, concepts, or flashcard pairs from the study notes. Format EACH card strictly as follows so it can be rendered interactively:
 
 ---FLASHCARD---
-FRONT: [Engineering Term, Formula, or Question]
-BACK: [Technical Definition, Algorithmic Step, or Complexity Bound]
+FRONT: [Key Term, Concept, or Question]
+BACK: [Clear Definition, Explanation, or Core Answer]
 
 Notes:
 """
@@ -93,14 +147,15 @@ ${notesText}
       break;
 
     case "diagram":
-      prompt = `Generate a clear Mermaid.js flowchart or architectural mind map to visualize the system flow or data structure:
+      prompt = `Generate a clear Mermaid.js flowchart or visual mind map to illustrate the concepts or process flow in the notes:
 
 \`\`\`mermaid
 graph TD
-  A["Start Process / Node"] --> B["Next Step / Subtree"]
+  A["Main Topic / Process"] --> B["Key Component / Step 1"]
+  A --> C["Key Component / Step 2"]
 \`\`\`
 
-Provide a 2-sentence technical architectural explanation below the diagram.
+Provide a 2-sentence summary below the diagram explaining the visual flowchart.
 
 Notes:
 """
@@ -109,7 +164,7 @@ ${notesText}
       break;
 
     default:
-      prompt = `Analyze and format these CS engineering notes with technical rigor:\n\n${notesText}`;
+      prompt = `Analyze and format these study notes with academic clarity:\n\n${notesText}`;
   }
 
   const generationConfig = {
@@ -117,7 +172,7 @@ ${notesText}
     temperature: 0.3,
     topP: 0.8,
     topK: 20,
-    maxOutputTokens: 800
+    maxOutputTokens: 2048
   };
 
   let accumulatedText = "";
@@ -143,7 +198,6 @@ ${notesText}
   } catch (err) {
     console.warn("Stream failed, falling back to generateContent:", err);
 
-    // Fallback standard call
     const response = await ai.models.generateContent({
       model: modelName,
       contents: prompt,

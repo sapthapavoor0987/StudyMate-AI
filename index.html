@@ -20,20 +20,28 @@
 
 <body data-theme="dark">
   <div id="app">
-    <!-- Navigation Header -->
+    <!-- Navigation Header (Top Navbar) -->
     <header class="app-header">
       <div class="header-container">
+        <!-- Left: Logo & Title -->
         <div class="brand">
           <div class="logo-icon">
             🎓
           </div>
           <div class="brand-text">
             <h1>StudyMate <span class="gradient-text">AI</span></h1>
-            <p class="tagline">Your AI-Powered Study Buddy</p>
+            <p class="tagline">Your AI-Powered Study Companion</p>
           </div>
         </div>
 
+        <!-- Right: Actions (Voice Mode, API Key, Theme Toggle) -->
         <div class="header-actions">
+          <!-- Voice Mode Button -->
+          <button id="voiceAssistantModalBtn" class="pill-btn voice-btn" title="Open Voice Assistant Companion">
+            <span class="btn-icon">🎤</span>
+            <span class="btn-text">Voice Mode</span>
+          </button>
+
           <!-- API Key Trigger -->
           <button id="apiKeyBtn" class="pill-btn key-btn" title="Configure Gemini API Key">
             <span class="key-status-indicator" id="keyIndicator"></span>
@@ -49,11 +57,11 @@
       </div>
     </header>
 
-    <!-- Main Container -->
+    <!-- Main Container: 2-Column Dashboard (Full Height 100vh) -->
     <main class="main-content">
       <div class="content-grid">
 
-        <!-- Left Panel: Input & Sample Notes -->
+        <!-- Left Column: Study Notes Input -->
         <section class="card input-card">
           <div class="card-header">
             <div class="header-title">
@@ -69,7 +77,7 @@
           <div class="card-body">
             <!-- Sample Preset Chips -->
             <div class="presets-container">
-              <span class="presets-label">⚡ Try sample notes:</span>
+              <span class="presets-label">⚡ Quick sample topics:</span>
               <div class="preset-chips">
                 <button class="chip-btn" data-preset="bankers">💻 OS: Banker's Algorithm</button>
                 <button class="chip-btn" data-preset="dijkstra">⚡ DSA: Dijkstra's Shortest Path</button>
@@ -77,13 +85,16 @@
               </div>
             </div>
 
-            <!-- Notes Textarea -->
+            <!-- Flexible Notes Textarea -->
             <div class="textarea-wrapper">
               <textarea id="notesInput"
                 placeholder="Paste or type your CS lecture notes, algorithm specs, or textbook concepts here...&#10;&#10;Example: Banker's algorithm tests for safety by simulating the allocation of maximum declared resources for all processes before granting requests..."
-                rows="10" spellcheck="true"></textarea>
+                rows="6" spellcheck="true"></textarea>
 
               <div class="textarea-actions">
+                <button id="voiceInputBtn" class="subtle-btn voice-input-btn" title="Speak notes with microphone voice input">
+                  <span class="mic-icon-anim">🎤</span> Voice Input
+                </button>
                 <button id="pasteBtn" class="subtle-btn" title="Paste clipboard text">
                   📋 Paste Clipboard
                 </button>
@@ -93,9 +104,9 @@
               </div>
             </div>
 
-            <!-- AI Action Buttons Grid -->
+            <!-- Bottom Action Grid: 4 Compact Cards in 2x2 Grid -->
             <div class="actions-section">
-              <h3 class="actions-title">Choose AI Action:</h3>
+              <h3 class="actions-title">CHOOSE AI ACTION:</h3>
               <div class="action-buttons-grid">
 
                 <button id="btnSummarize" class="action-btn action-summarize" data-action="summarize">
@@ -120,8 +131,8 @@
                   <div class="btn-glow"></div>
                   <span class="action-icon">🎯</span>
                   <div class="action-label">
-                    <strong>Generate Questions</strong>
-                    <small>Quiz & Answer Key</small>
+                    <strong>Practice Quiz</strong>
+                    <small>MCQ & Answer Key</small>
                   </div>
                 </button>
 
@@ -129,17 +140,8 @@
                   <div class="btn-glow"></div>
                   <span class="action-icon">🎴</span>
                   <div class="action-label">
-                    <strong>Flashcards</strong>
-                    <small>Terms & Definitions</small>
-                  </div>
-                </button>
-
-                <button id="btnDiagram" class="action-btn action-diagram" data-action="diagram">
-                  <div class="btn-glow"></div>
-                  <span class="action-icon">🗺️</span>
-                  <div class="action-label">
-                    <strong>Mind Map / Diagram</strong>
-                    <small>Mermaid Flowchart</small>
+                    <strong>Key Terms</strong>
+                    <small>Flashcards & Definitions</small>
                   </div>
                 </button>
 
@@ -149,7 +151,7 @@
           </div>
         </section>
 
-        <!-- Right Panel: AI Output Response -->
+        <!-- Right Column: AI Response Workspace -->
         <section class="card output-card" id="outputSection">
           <div class="card-header">
             <div class="header-title">
@@ -178,12 +180,12 @@
           </div>
 
           <div class="card-body">
-            <!-- Empty State placeholder -->
+
+            <!-- Empty State: Compact 3D Robot Mascot Illustration above Headline -->
             <div id="emptyState" class="empty-state">
-              <div class="empty-illustration">✨</div>
+              <img src="/robot-avatar.png" alt="StudyMate Robot Mascot" class="empty-robot-mascot" />
               <h3>Ready for Your Notes</h3>
-              <p>Enter or paste your study notes on the left and click any AI action button above to generate summaries,
-                simple explanations, or quiz practice!</p>
+              <p>Enter or paste your study notes on the left and click any AI action button above to generate summaries, simple explanations, or quiz practice!</p>
             </div>
 
             <!-- Loading Skeleton state -->
@@ -211,7 +213,7 @@
               <button id="errorFixBtn" class="primary-btn sm-btn">Fix API Key</button>
             </div>
 
-            <!-- AI Rendered Markdown Response Container -->
+            <!-- AI Rendered Markdown Response Container (Replaces mascot when generated) -->
             <div id="responseContainer" class="response-container markdown-body" style="display: none;"></div>
 
           </div>
@@ -260,6 +262,52 @@
           <button id="cancelKeyBtn" class="subtle-btn">Cancel</button>
           <button id="saveKeyBtn" class="primary-btn">Save Key</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Voice Assistant Interactive Modal -->
+  <div id="voiceAssistantModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card voice-assistant-card">
+      <div class="modal-header">
+        <h3>🎤 StudyMate Voice Assistant</h3>
+        <button id="closeVoiceModalBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body voice-modal-body">
+        
+        <div class="voice-robot-avatar-container">
+          <div class="voice-equalizer-ring" id="voiceEqualizerRing"></div>
+          <img src="/robot-avatar.png" alt="StudyMate Voice Companion" class="voice-avatar-img" id="voiceAvatarImg" />
+        </div>
+
+        <div class="voice-status-box">
+          <h4 id="voiceStatusTitle">Tap Mic to Start Talking</h4>
+          <p id="voiceStatusSub">Ask "Explain Banker's Algorithm" or speak your notes!</p>
+        </div>
+
+        <!-- Live Speech Recognition Transcript Box -->
+        <div class="voice-transcript-box" id="voiceTranscriptBox">
+          <span class="transcript-placeholder" id="transcriptPlaceholder">Your voice speech will appear here in real-time...</span>
+          <span id="liveTranscriptText"></span>
+        </div>
+
+        <!-- Equalizer Audio Waves -->
+        <div class="sound-wave-bars" id="soundWaveBars">
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+          <div class="bar"></div>
+        </div>
+
+      </div>
+      <div class="modal-footer voice-modal-footer">
+        <button id="toggleVoiceMicBtn" class="primary-btn voice-mic-trigger">
+          🎤 Start Listening
+        </button>
+        <button id="voiceAskGeminiBtn" class="primary-btn voice-send-btn" style="display: none;">
+          ⚡ Ask StudyMate Bot
+        </button>
       </div>
     </div>
   </div>
