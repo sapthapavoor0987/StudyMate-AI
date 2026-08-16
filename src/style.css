@@ -222,7 +222,10 @@ body {
 
 /* Layout Grid & 100vh Viewport Fit */
 @media (min-width: 960px) {
-  html, body, #app {
+
+  html,
+  body,
+  #app {
     height: 100vh;
     max-height: 100vh;
     overflow: hidden;
@@ -278,6 +281,7 @@ body {
   .main-content {
     padding: 1.25rem 1rem;
   }
+
   .content-grid {
     display: grid;
     grid-template-columns: 1fr;
