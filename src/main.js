@@ -127,6 +127,11 @@ const themeToggleBtn = document.getElementById("themeToggleBtn");
 const pasteBtn = document.getElementById("pasteBtn");
 const clearBtn = document.getElementById("clearBtn");
 
+// Robot Mascot Companion Elements
+const robotCompanionBar = document.getElementById("robotCompanionBar");
+const robotStatusMsg = document.getElementById("robotStatusMsg");
+const speechBubbleWrapper = document.getElementById("speechBubbleWrapper");
+
 // Action Buttons
 const btnSummarize = document.getElementById("btnSummarize");
 const btnExplain = document.getElementById("btnExplain");
@@ -181,11 +186,36 @@ function escapeHTML(str) {
     .replace(/'/g, "&#039;");
 }
 
+// Helper: Sanitize LaTeX math dollar signs & macros into clean Markdown code backticks
+function sanitizeLatexMath(text) {
+  if (!text) return "";
+  let clean = text;
+
+  // Replace common LaTeX macros with clean math symbols
+  clean = clean
+    .replace(/\\le\b|\\leq\b/g, "<=")
+    .replace(/\\ge\b|\\geq\b/g, ">=")
+    .replace(/\\neq\b/g, "!=")
+    .replace(/\\times\b/g, "×")
+    .replace(/\\infty\b/g, "∞")
+    .replace(/\\approx\b/g, "≈")
+    .replace(/\\rightarrow\b/g, "→")
+    .replace(/\\leftarrow\b/g, "←")
+    .replace(/\\Rightarrow\b/g, "⇒")
+    .replace(/\\Leftarrow\b/g, "⇐");
+
+  // Convert $$expression$$ or $expression$ into `expression`
+  clean = clean.replace(/\$\$([^\$]+)\$\$/g, '`$1`');
+  clean = clean.replace(/\$([^\$\n]+)\$/g, '`$1`');
+  return clean;
+}
+
 // Initialize App
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   updateApiKeyStatusUI();
   setupEventListeners();
+  setupVoiceAssistant();
   updateWordAndCharCount();
 });
 
@@ -240,8 +270,30 @@ function showState(stateName) {
     emptyState.style.display = stateName === "empty" ? "flex" : "none";
     loadingState.style.display = stateName === "loading" ? "flex" : "none";
     errorState.style.display = stateName === "error" ? "flex" : "none";
+
+    if (speechBubbleWrapper) {
+      speechBubbleWrapper.style.display = stateName === "response" ? "block" : "none";
+    }
+
     responseContainer.style.display = stateName === "response" ? "block" : "none";
     outputControls.style.display = stateName === "response" ? "flex" : "none";
+
+    if (robotCompanionBar) {
+      if (stateName === "loading") {
+        robotCompanionBar.classList.add("is-generating");
+        if (robotStatusMsg) robotStatusMsg.textContent = "StudyMate Bot is distilling your notes...";
+      } else {
+        robotCompanionBar.classList.remove("is-generating");
+      }
+
+      if (stateName === "empty" && robotStatusMsg) {
+        robotStatusMsg.textContent = "StudyMate Bot is ready to help you learn!";
+      }
+
+      if (stateName === "error" && robotStatusMsg) {
+        robotStatusMsg.textContent = "StudyMate Bot encountered an issue!";
+      }
+    }
   });
 }
 
@@ -363,7 +415,7 @@ function parseQuizQuestions(text) {
 async function renderQuizSuite() {
   if (!quizQuestions || quizQuestions.length === 0) {
     const marked = await getMarked();
-    responseContainer.innerHTML = marked.parse(lastRawResponse);
+    responseContainer.innerHTML = marked.parse(sanitizeLatexMath(lastRawResponse));
     return;
   }
 
@@ -544,7 +596,7 @@ async function renderQuizSuite() {
 async function renderFlashcardsDeck() {
   if (!flashcardDeck || flashcardDeck.length === 0) {
     const marked = await getMarked();
-    responseContainer.innerHTML = marked.parse(lastRawResponse);
+    responseContainer.innerHTML = marked.parse(sanitizeLatexMath(lastRawResponse));
     return;
   }
 
@@ -712,11 +764,23 @@ async function handleAIAction(actionType) {
     diagram: { title: "Mind Map & Visual Diagram", icon: "🗺️", loading: "Streaming visual flowchart code..." }
   };
 
+  const robotMsgs = {
+    summarize: "StudyMate Bot distilled your key takeaways! ✨",
+    explain: "StudyMate Bot explained the core concepts simply! 💡",
+    questions: "StudyMate Bot crafted your interactive practice quiz! 🎯",
+    flashcards: "StudyMate Bot generated your 3D Flashcards! 🎴",
+    diagram: "StudyMate Bot rendered your visual mind map flowchart! 🗺️"
+  };
+
   const meta = actionMeta[actionType] || { title: "AI Response", icon: "🤖", loading: "Processing..." };
 
   outputIcon.textContent = meta.icon;
   outputTitle.textContent = meta.title;
   loadingText.textContent = meta.loading;
+
+  if (robotStatusMsg && robotMsgs[actionType]) {
+    robotStatusMsg.textContent = robotMsgs[actionType];
+  }
 
   const outputSection = document.getElementById("outputSection");
   if (outputSection) outputSection.classList.add("is-streaming");
@@ -738,18 +802,22 @@ async function handleAIAction(actionType) {
           responseContainer.innerHTML = "";
         }
 
-        // Lightweight DOM Streaming Buffer: Plain text update during stream (NO heavy Markdown re-parsing on every chunk)
-        responseContainer.innerHTML = `<div class="streaming-text-box">${escapeHTML(currentFullText)}</div>`;
+        // Clean LaTeX math symbols during streaming buffer
+        const cleanChunk = sanitizeLatexMath(currentFullText);
+        responseContainer.innerHTML = `<div class="streaming-text-box">${escapeHTML(cleanChunk)}</div>`;
       }
     );
 
     if (outputSection) outputSection.classList.remove("is-streaming");
-    lastRawResponse = fullMarkdown;
+
+    // Sanitize dollar signs & LaTeX macros into clean markdown backticks & math symbols
+    const cleanedMarkdown = sanitizeLatexMath(fullMarkdown);
+    lastRawResponse = cleanedMarkdown;
     const marked = await getMarked();
 
     // Parse Markdown ONCE when stream finishes
     if (actionType === "flashcards") {
-      flashcardDeck = parseFlashcards(fullMarkdown);
+      flashcardDeck = parseFlashcards(cleanedMarkdown);
       currentCardIndex = 0;
       isFlipped = false;
       flashcardViewMode = "flip";
@@ -757,10 +825,10 @@ async function handleAIAction(actionType) {
       if (flashcardDeck.length > 0) {
         await renderFlashcardsDeck();
       } else {
-        responseContainer.innerHTML = marked.parse(fullMarkdown);
+        responseContainer.innerHTML = marked.parse(cleanedMarkdown);
       }
     } else if (actionType === "questions") {
-      quizQuestions = parseQuizQuestions(fullMarkdown);
+      quizQuestions = parseQuizQuestions(cleanedMarkdown);
       currentQuizIndex = 0;
       userQuizAnswers = {};
       quizScore = 0;
@@ -768,13 +836,13 @@ async function handleAIAction(actionType) {
       if (quizQuestions.length > 0) {
         await renderQuizSuite();
       } else {
-        responseContainer.innerHTML = marked.parse(fullMarkdown);
+        responseContainer.innerHTML = marked.parse(cleanedMarkdown);
       }
     } else if (actionType === "diagram") {
-      responseContainer.innerHTML = marked.parse(fullMarkdown);
+      responseContainer.innerHTML = marked.parse(cleanedMarkdown);
       await processMermaidDiagrams(responseContainer);
     } else {
-      responseContainer.innerHTML = marked.parse(fullMarkdown);
+      responseContainer.innerHTML = marked.parse(cleanedMarkdown);
       await processMermaidDiagrams(responseContainer);
     }
 
@@ -802,6 +870,232 @@ async function handleAIAction(actionType) {
       errorMessage.textContent = error.message || "An unexpected error occurred while communicating with Gemini API.";
       errorFixBtn.style.display = "none";
     }
+  }
+}
+
+/**
+ * Setup Full Voice Assistant Mode (STT Speech Recognition & Hands-Free Interaction)
+ */
+function setupVoiceAssistant() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  const voiceInputBtn = document.getElementById("voiceInputBtn");
+  const voiceAssistantModalBtn = document.getElementById("voiceAssistantModalBtn");
+  const voiceAssistantModal = document.getElementById("voiceAssistantModal");
+  const closeVoiceModalBtn = document.getElementById("closeVoiceModalBtn");
+  const toggleVoiceMicBtn = document.getElementById("toggleVoiceMicBtn");
+  const voiceAskGeminiBtn = document.getElementById("voiceAskGeminiBtn");
+  const voiceStatusTitle = document.getElementById("voiceStatusTitle");
+  const voiceStatusSub = document.getElementById("voiceStatusSub");
+  const transcriptPlaceholder = document.getElementById("transcriptPlaceholder");
+  const liveTranscriptText = document.getElementById("liveTranscriptText");
+  const voiceModalBody = document.querySelector(".voice-modal-body");
+
+  let textareaRecognition = null;
+  let modalRecognition = null;
+  let isTextareaListening = false;
+  let isModalListening = false;
+
+  if (!SpeechRecognition) {
+    console.warn("Speech Recognition API is not supported in this browser.");
+    if (voiceInputBtn) {
+      voiceInputBtn.addEventListener("click", () => {
+        showToast("⚠️ Speech Recognition is not supported in this browser (Use Chrome or Edge).");
+      });
+    }
+    if (voiceAssistantModalBtn) {
+      voiceAssistantModalBtn.addEventListener("click", () => {
+        showToast("⚠️ Speech Recognition is not supported in this browser (Use Chrome or Edge).");
+      });
+    }
+    return;
+  }
+
+  // 1. Textarea Voice Input Dictation
+  textareaRecognition = new SpeechRecognition();
+  textareaRecognition.continuous = true;
+  textareaRecognition.interimResults = true;
+  textareaRecognition.lang = "en-US";
+
+  textareaRecognition.onstart = () => {
+    isTextareaListening = true;
+    if (voiceInputBtn) {
+      voiceInputBtn.classList.add("is-listening");
+      voiceInputBtn.innerHTML = `<span class="mic-icon-anim">🛑</span> Stop Listening`;
+    }
+    showToast("🎤 Listening... Speak your notes clearly!");
+  };
+
+  textareaRecognition.onresult = (e) => {
+    let transcript = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    if (transcript.trim()) {
+      notesInput.value = (notesInput.value ? notesInput.value + " " : "") + transcript;
+      updateWordAndCharCount();
+    }
+  };
+
+  textareaRecognition.onerror = (e) => {
+    console.warn("Textarea Speech Recognition error:", e);
+    showToast("⚠️ Microphone notice: " + (e.error || "Permission required"));
+    stopTextareaListening();
+  };
+
+  textareaRecognition.onend = () => {
+    stopTextareaListening();
+  };
+
+  function stopTextareaListening() {
+    isTextareaListening = false;
+    if (voiceInputBtn) {
+      voiceInputBtn.classList.remove("is-listening");
+      voiceInputBtn.innerHTML = `<span class="mic-icon-anim">🎤</span> Voice Input`;
+    }
+  }
+
+  if (voiceInputBtn) {
+    voiceInputBtn.addEventListener("click", () => {
+      if (isTextareaListening) {
+        textareaRecognition.stop();
+      } else {
+        try {
+          textareaRecognition.start();
+        } catch (err) {
+          console.warn("Start recognition err:", err);
+        }
+      }
+    });
+  }
+
+  // 2. Interactive Hands-Free Voice Assistant Modal
+  modalRecognition = new SpeechRecognition();
+  modalRecognition.continuous = false;
+  modalRecognition.interimResults = true;
+  modalRecognition.lang = "en-US";
+
+  const openVoiceModal = () => {
+    requestAnimationFrame(() => {
+      voiceAssistantModal.style.display = "flex";
+      resetModalVoiceUI();
+    });
+  };
+
+  const closeVoiceModal = () => {
+    if (isModalListening) modalRecognition.stop();
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    requestAnimationFrame(() => {
+      voiceAssistantModal.style.display = "none";
+    });
+  };
+
+  function resetModalVoiceUI() {
+    isModalListening = false;
+    if (voiceModalBody) voiceModalBody.classList.remove("is-active", "is-listening", "is-speaking");
+    if (toggleVoiceMicBtn) {
+      toggleVoiceMicBtn.classList.remove("is-listening");
+      toggleVoiceMicBtn.innerHTML = "🎤 Start Listening";
+    }
+    if (voiceAskGeminiBtn) voiceAskGeminiBtn.style.display = "none";
+    if (voiceStatusTitle) voiceStatusTitle.textContent = "Tap Mic to Start Talking";
+    if (voiceStatusSub) voiceStatusSub.textContent = "Ask 'Explain Banker's Algorithm' or speak your question!";
+    if (transcriptPlaceholder) transcriptPlaceholder.style.display = "inline";
+    if (liveTranscriptText) liveTranscriptText.textContent = "";
+  }
+
+  if (voiceAssistantModalBtn) voiceAssistantModalBtn.addEventListener("click", openVoiceModal);
+  if (closeVoiceModalBtn) closeVoiceModalBtn.addEventListener("click", closeVoiceModal);
+  if (voiceAssistantModal) {
+    voiceAssistantModal.addEventListener("click", (e) => {
+      if (e.target === voiceAssistantModal) closeVoiceModal();
+    });
+  }
+
+  modalRecognition.onstart = () => {
+    isModalListening = true;
+    if (voiceModalBody) {
+      voiceModalBody.classList.add("is-active", "is-listening");
+      voiceModalBody.classList.remove("is-speaking");
+    }
+    if (toggleVoiceMicBtn) {
+      toggleVoiceMicBtn.classList.add("is-listening");
+      toggleVoiceMicBtn.innerHTML = "🛑 Stop Listening";
+    }
+    if (voiceStatusTitle) voiceStatusTitle.textContent = "Listening to your voice...";
+    if (voiceStatusSub) voiceStatusSub.textContent = "Speak clearly into your microphone";
+    if (transcriptPlaceholder) transcriptPlaceholder.style.display = "none";
+  };
+
+  modalRecognition.onresult = (e) => {
+    let transcript = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    if (liveTranscriptText) liveTranscriptText.textContent = transcript;
+    if (transcript.trim() && voiceAskGeminiBtn) {
+      voiceAskGeminiBtn.style.display = "inline-block";
+    }
+  };
+
+  modalRecognition.onerror = (e) => {
+    console.warn("Modal Speech Recognition error:", e);
+    showToast("⚠️ Voice notice: " + (e.error || "Permission required"));
+    resetModalVoiceUI();
+  };
+
+  modalRecognition.onend = () => {
+    isModalListening = false;
+    if (voiceModalBody) voiceModalBody.classList.remove("is-listening");
+    if (toggleVoiceMicBtn) {
+      toggleVoiceMicBtn.classList.remove("is-listening");
+      toggleVoiceMicBtn.innerHTML = "🎤 Tap Mic to Talk";
+    }
+
+    const finalQuery = liveTranscriptText ? liveTranscriptText.textContent.trim() : "";
+    if (finalQuery) {
+      if (voiceStatusTitle) voiceStatusTitle.textContent = "Speech Captured!";
+      if (voiceStatusSub) voiceStatusSub.textContent = "Click 'Ask StudyMate Bot' or tap mic again to re-record.";
+      if (voiceAskGeminiBtn) voiceAskGeminiBtn.style.display = "inline-block";
+    } else {
+      if (voiceStatusTitle) voiceStatusTitle.textContent = "No speech detected";
+      if (voiceStatusSub) voiceStatusSub.textContent = "Tap mic to try speaking again.";
+    }
+  };
+
+  if (toggleVoiceMicBtn) {
+    toggleVoiceMicBtn.addEventListener("click", () => {
+      if (isModalListening) {
+        modalRecognition.stop();
+      } else {
+        if (liveTranscriptText) liveTranscriptText.textContent = "";
+        if (transcriptPlaceholder) transcriptPlaceholder.style.display = "none";
+        try {
+          modalRecognition.start();
+        } catch (err) {
+          console.warn("Start modal recognition err:", err);
+        }
+      }
+    });
+  }
+
+  if (voiceAskGeminiBtn) {
+    voiceAskGeminiBtn.addEventListener("click", () => {
+      const spokenQuery = liveTranscriptText ? liveTranscriptText.textContent.trim() : "";
+      if (!spokenQuery) return;
+
+      notesInput.value = spokenQuery;
+      updateWordAndCharCount();
+      closeVoiceModal();
+
+      // Trigger AI explanation and read back response
+      handleAIAction("explain").then(() => {
+        // Auto-trigger Speech Synthesis Read Aloud for Voice Assistant mode
+        setTimeout(() => {
+          if (speakBtn) speakBtn.click();
+        }, 500);
+      });
+    });
   }
 }
 
